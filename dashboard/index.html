@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sovereign Trading System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600;700&family=Tajawal:wght@300;400;700;900&display=swap');
+
+  :root {
+    --bg:       #080c12;
+    --surface:  #0d1420;
+    --border:   #1a2535;
+    --accent:   #00d4ff;
+    --green:    #00ff9d;
+    --red:      #ff3d5a;
+    --yellow:   #ffd060;
+    --purple:   #9b5de5;
+    --text:     #cdd6e8;
+    --muted:    #4a5a72;
+    --glow:     0 0 20px rgba(0,212,255,0.15);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Tajawal', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline effect */
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events:none;
+    z-index:1000;
+  }
+
+  /* Header */
+  .header {
+    padding: 16px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 100;
+  }
+
+  .logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .logo span { color: var(--muted); }
+
+  .status-bar {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+  }
+
+  .live-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity:1; box-shadow:0 0 0 0 rgba(0,255,157,0.4); }
+    50% { opacity:.7; box-shadow:0 0 0 6px rgba(0,255,157,0); }
+  }
+
+  .time {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* Grid Layout */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 12px;
+    padding: 20px 24px;
+    max-width: 1800px;
+    margin: 0 auto;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .2s;
+  }
+
+  .card:hover { border-color: var(--accent); }
+
+  .card::before {
+    content:'';
+    position:absolute;
+    top:0; right:0;
+    width:40%;
+    height:1px;
+    background: linear-gradient(90deg, transparent, var(--accent));
+  }
+
+  .card-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .card-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .card-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  .positive { color: var(--green); }
+  .negative { color: var(--red); }
+  .neutral  { color: var(--accent); }
+  .warning  { color: var(--yellow); }
+
+  /* Spans */
+  .col-3  { grid-column: span 3; }
+  .col-4  { grid-column: span 4; }
+  .col-6  { grid-column: span 6; }
+  .col-8  { grid-column: span 8; }
+  .col-12 { grid-column: span 12; }
+
+  /* Agents Grid */
+  .agents-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+  }
+
+  .agent-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    transition: all .2s;
+  }
+
+  .agent-card.healthy { border-color: rgba(0,255,157,0.3); }
+  .agent-card.warning { border-color: rgba(255,208,96,0.3); }
+  .agent-card.critical { border-color: rgba(255,61,90,0.5); }
+
+  .agent-name {
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--text);
+  }
+
+  .agent-status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+
+  .dot-green  { background: var(--green); }
+  .dot-yellow { background: var(--yellow); }
+  .dot-red    { background: var(--red); }
+
+  .agent-metric {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+
+  /* Events Feed */
+  .events-feed {
+    height: 280px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .event-item {
+    display: flex;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(26,37,53,0.6);
+    align-items: flex-start;
+    animation: fadeIn .3s ease;
+  }
+
+  @keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; } }
+
+  .event-time {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    min-width: 60px;
+    direction: ltr;
+  }
+
+  .event-type {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    min-width: 80px;
+    text-align: center;
+  }
+
+  .type-critical { background: rgba(255,61,90,.15); color: var(--red); }
+  .type-warning  { background: rgba(255,208,96,.15); color: var(--yellow); }
+  .type-info     { background: rgba(0,212,255,.1); color: var(--accent); }
+  .type-success  { background: rgba(0,255,157,.1); color: var(--green); }
+
+  .event-msg {
+    font-size: 12px;
+    color: var(--text);
+    flex: 1;
+    line-height: 1.4;
+  }
+
+  /* Market Regime Badges */
+  .regime-badges {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .regime-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--bg);
+    border-radius: 5px;
+    border: 1px solid var(--border);
+  }
+
+  .regime-symbol {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .regime-badge {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 700;
+  }
+
+  .regime-trending_up    { background: rgba(0,255,157,.15); color:var(--green); }
+  .regime-trending_down  { background: rgba(255,61,90,.15);  color:var(--red); }
+  .regime-ranging        { background: rgba(0,212,255,.1);   color:var(--accent); }
+  .regime-volatile       { background: rgba(255,208,96,.15); color:var(--yellow); }
+
+  .regime-vol {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  /* Params Table */
+  .params-table { width:100%; }
+  .params-table tr td {
+    padding: 6px 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .params-table tr td:first-child { color: var(--muted); }
+  .params-table tr td:last-child  { color: var(--accent); text-align:left; }
+
+  /* Risk Meter */
+  .risk-meter {
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 12px 0;
+  }
+
+  .risk-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width .5s ease;
+  }
+
+  /* Chart containers */
+  canvas { max-height: 180px; }
+
+  /* Halt Banner */
+  .halt-banner {
+    display: none;
+    background: rgba(255,61,90,0.1);
+    border: 1px solid var(--red);
+    border-radius: 6px;
+    padding: 12px 20px;
+    color: var(--red);
+    font-weight: 700;
+    text-align: center;
+    animation: blink 1s infinite;
+    grid-column: span 12;
+  }
+
+  .halt-banner.active { display: block; }
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:.6;} }
+
+  /* Section headers */
+  .section-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    padding: 8px 24px;
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">SOVEREIGN <span>// TRADING SYSTEM</span></div>
+  <div class="status-bar">
+    <div class="live-dot"></div>
+    <span style="font-size:12px;color:var(--muted)">LIVE</span>
+    <div class="time" id="clock">--:--:--</div>
+  </div>
+</header>
+
+<div class="grid">
+
+  <!-- Halt Banner -->
+  <div class="halt-banner" id="haltBanner">
+    🚨 التداول موقوف — <span id="haltReason"></span>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="card col-3">
+    <div class="card-label">PnL الإجمالي</div>
+    <div class="card-value" id="totalPnl">--</div>
+    <div class="card-sub">منذ بداية النظام</div>
+  </div>
+
+  <div class="card col-3">
+    <div class="card-label">PnL اليوم</div>
+    <div class="card-value" id="dailyPnl">--</div>
+    <div class="card-sub">آخر 24 ساعة</div>
+  </div>
+
+  <div class="card col-3">
+    <div class="card-label">Win Rate</div>
+    <div class="card-value neutral" id="winRate">--</div>
+    <div class="card-sub" id="tradesCount">-- صفقة</div>
+  </div>
+
+  <div class="card col-3">
+    <div class="card-label">Sharpe Ratio</div>
+    <div class="card-value neutral" id="sharpe">--</div>
+    <div class="card-sub">Max DD: <span id="maxDD">--</span></div>
+  </div>
+
+  <!-- PnL Chart -->
+  <div class="card col-8">
+    <div class="card-label">منحنى الأداء التراكمي</div>
+    <canvas id="pnlChart"></canvas>
+  </div>
+
+  <!-- Risk Panel -->
+  <div class="card col-4">
+    <div class="card-label">مستوى المخاطرة</div>
+    <div class="card-value" id="riskScore" style="font-size:42px">--</div>
+    <div class="card-sub">Risk Score / 100</div>
+    <div class="risk-meter">
+      <div class="risk-fill" id="riskFill" style="width:0%;background:var(--green)"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+      <div style="font-size:11px">
+        <div style="color:var(--muted);font-size:10px">VaR 95%</div>
+        <div class="neutral" style="font-family:monospace" id="var95">--</div>
+      </div>
+      <div style="font-size:11px">
+        <div style="color:var(--muted);font-size:10px">Drawdown اليوم</div>
+        <div id="dailyDD" style="font-family:monospace">--</div>
+      </div>
+      <div style="font-size:11px">
+        <div style="color:var(--muted);font-size:10px">Positions</div>
+        <div class="neutral" style="font-family:monospace" id="openPos">--</div>
+      </div>
+      <div style="font-size:11px">
+        <div style="color:var(--muted);font-size:10px">حالة التداول</div>
+        <div id="tradingStatus" style="font-family:monospace">--</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Agents Section -->
+<div class="section-title">// حالة الـ Agents</div>
+<div style="padding:0 24px 12px">
+  <div class="agents-grid" id="agentsGrid">
+    <!-- filled by JS -->
+  </div>
+</div>
+
+<div class="grid">
+
+  <!-- Market Regimes -->
+  <div class="card col-3">
+    <div class="card-label">حالة الأسواق</div>
+    <div class="regime-badges" id="regimeBadges">
+      <div style="color:var(--muted);font-size:12px">جارٍ التحميل...</div>
+    </div>
+  </div>
+
+  <!-- Strategy Params -->
+  <div class="card col-3">
+    <div class="card-label">البارامترات الحالية</div>
+    <table class="params-table" id="paramsTable">
+      <tr><td>Fast MA</td><td id="p-fast">--</td></tr>
+      <tr><td>Slow MA</td><td id="p-slow">--</td></tr>
+      <tr><td>RSI Period</td><td id="p-rsi">--</td></tr>
+      <tr><td>RSI OB</td><td id="p-ob">--</td></tr>
+      <tr><td>RSI OS</td><td id="p-os">--</td></tr>
+      <tr><td>ATR Mult</td><td id="p-atr">--</td></tr>
+    </table>
+  </div>
+
+  <!-- Execution Quality -->
+  <div class="card col-3">
+    <div class="card-label">جودة التنفيذ</div>
+    <div class="card-value neutral" id="execScore">--</div>
+    <div class="card-sub">Execution Score</div>
+    <div style="margin-top:16px;display:grid;gap:8px">
+      <div style="display:flex;justify-content:space-between;font-size:11px">
+        <span style="color:var(--muted)">متوسط Slippage</span>
+        <span style="font-family:monospace" id="avgSlippage">--</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px">
+        <span style="color:var(--muted)">أعلى Slippage</span>
+        <span style="font-family:monospace" id="maxSlippage">--</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px">
+        <span style="color:var(--muted)">تحذيرات السيولة</span>
+        <span style="font-family:monospace" id="liqWarnings">--</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px">
+        <span style="color:var(--muted)">أوامر محللة</span>
+        <span style="font-family:monospace" id="ordersAnalyzed">--</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- System Health -->
+  <div class="card col-3">
+    <div class="card-label">صحة النظام</div>
+    <div class="card-value" id="sysHealth">--</div>
+    <div class="card-sub">System Health %</div>
+    <div style="margin-top:16px;display:grid;gap:8px">
+      <div style="display:flex;justify-content:space-between;font-size:11px">
+        <span style="color:var(--muted)">Anomalies</span>
+        <span style="font-family:monospace;color:var(--yellow)" id="anomalies">--</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px">
+        <span style="color:var(--muted)">تنبيهات أُرسلت</span>
+        <span style="font-family:monospace" id="alertsSent">--</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px">
+        <span style="color:var(--muted)">Backtest اخير</span>
+        <span style="font-family:monospace;color:var(--green)" id="lastBacktest">--</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px">
+        <span style="color:var(--muted)">تحديثات مقترحة</span>
+        <span style="font-family:monospace;color:var(--purple)" id="paramUpdates">--</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Events Feed -->
+  <div class="card col-12">
+    <div class="card-label">سجل الأحداث المباشر</div>
+    <div class="events-feed" id="eventsFeed">
+      <div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">
+        في انتظار الـ agents...
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── Config ───────────────────────────────────────────
+const API = 'http://localhost:8000/api';
+let pnlChart;
+let pnlHistory = [];
+let eventHistory = [];
+
+// ─── Clock ────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('ar-SA', {hour12:false});
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ─── Charts ───────────────────────────────────────────
+function initCharts() {
+  const ctx = document.getElementById('pnlChart').getContext('2d');
+  pnlChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Cumulative PnL %',
+        data: [],
+        borderColor: '#00d4ff',
+        backgroundColor: 'rgba(0,212,255,0.05)',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.4,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { display: false },
+        y: {
+          grid: { color:'rgba(26,37,53,0.8)' },
+          ticks: {
+            color: '#4a5a72',
+            font: { family:'IBM Plex Mono', size:10 },
+            callback: v => v.toFixed(2)+'%'
+          }
+        }
+      }
+    }
+  });
+}
+
+// ─── Fetch & Update ───────────────────────────────────
+async function fetchAndUpdate() {
+  try {
+    const [summary, perf, agents, events] = await Promise.all([
+      fetch(`${API}/summary`).then(r=>r.json()).catch(()=>null),
+      fetch(`${API}/performance`).then(r=>r.json()).catch(()=>null),
+      fetch(`${API}/agents`).then(r=>r.json()).catch(()=>null),
+      fetch(`${API}/events?n=30`).then(r=>r.json()).catch(()=>null),
+    ]);
+
+    if (summary) updateSummary(summary);
+    if (perf)    updatePerformance(perf);
+    if (agents)  updateAgents(agents);
+    if (events)  updateEvents(events);
+
+  } catch(e) {
+    // API not connected yet — show mock data
+    showMockData();
+  }
+}
+
+function updateSummary(d) {
+  const p = d.performance || {};
+  const r = d.risk || {};
+  const m = d.market || {};
+
+  // PnL
+  const totalPnl = p.total_pnl || 0;
+  const dailyPnl = p.daily_pnl || 0;
+  const pnlEl = document.getElementById('totalPnl');
+  pnlEl.textContent = (totalPnl >= 0 ? '+' : '') + totalPnl.toFixed(2) + '%';
+  pnlEl.className = 'card-value ' + (totalPnl >= 0 ? 'positive' : 'negative');
+
+  const dpEl = document.getElementById('dailyPnl');
+  dpEl.textContent = (dailyPnl >= 0 ? '+' : '') + dailyPnl.toFixed(2) + '%';
+  dpEl.className = 'card-value ' + (dailyPnl >= 0 ? 'positive' : 'negative');
+
+  document.getElementById('winRate').textContent = (p.win_rate || 0).toFixed(1) + '%';
+  document.getElementById('tradesCount').textContent = (p.total_trades || 0) + ' صفقة';
+  document.getElementById('sharpe').textContent = (p.sharpe || 0).toFixed(2);
+  document.getElementById('maxDD').textContent = (p.max_drawdown || 0).toFixed(2) + '%';
+
+  // Risk
+  document.getElementById('var95').textContent = (r.var_95 || 0).toFixed(3) + '%';
+  const dd = r.daily_drawdown_pct || 0;
+  const ddEl = document.getElementById('dailyDD');
+  ddEl.textContent = dd.toFixed(2) + '%';
+  ddEl.style.color = dd > 2 ? 'var(--red)' : dd > 1 ? 'var(--yellow)' : 'var(--green)';
+  document.getElementById('openPos').textContent = r.open_positions || 0;
+
+  const halted = r.trading_halted;
+  const statusEl = document.getElementById('tradingStatus');
+  statusEl.textContent = halted ? '🔴 موقوف' : '🟢 نشط';
+  statusEl.style.color = halted ? 'var(--red)' : 'var(--green)';
+
+  const banner = document.getElementById('haltBanner');
+  if (halted) {
+    banner.classList.add('active');
+    document.getElementById('haltReason').textContent = r.halt_reason || '';
+  } else {
+    banner.classList.remove('active');
+  }
+
+  // Market Regimes
+  const regimesEl = document.getElementById('regimeBadges');
+  if (m && Object.keys(m).length) {
+    const emojiMap = {trending_up:'📈', trending_down:'📉', ranging:'↔️', volatile:'⚡'};
+    regimesEl.innerHTML = Object.entries(m).map(([sym,r]) => `
+      <div class="regime-item">
+        <span class="regime-symbol">${sym.replace('USDT','')}</span>
+        <span class="regime-badge regime-${r.regime}">${emojiMap[r.regime]||''} ${r.regime}</span>
+        <span class="regime-vol">${(r.volatility||0).toFixed(1)}%</span>
+      </div>
+    `).join('');
+  }
+
+  // Strategy params
+  const sp = d.strategy_params || {};
+  document.getElementById('p-fast').textContent = sp.fast_ma || '--';
+  document.getElementById('p-slow').textContent = sp.slow_ma || '--';
+  document.getElementById('p-rsi').textContent  = sp.rsi_period || '--';
+  document.getElementById('p-ob').textContent   = sp.rsi_overbought || '--';
+  document.getElementById('p-os').textContent   = sp.rsi_oversold || '--';
+  document.getElementById('p-atr').textContent  = sp.atr_multiplier || '--';
+}
+
+function updatePerformance(d) {
+  // Update PnL Chart
+  const trades = d.trades_history || [];
+  if (trades.length > 0) {
+    let cum = 0;
+    const labels = [];
+    const values = [];
+    trades.slice(-50).forEach((t,i) => {
+      cum += t.pnl || 0;
+      labels.push(i);
+      values.push(parseFloat(cum.toFixed(3)));
+    });
+    pnlChart.data.labels = labels;
+    pnlChart.data.datasets[0].data = values;
+    const last = values[values.length-1] || 0;
+    pnlChart.data.datasets[0].borderColor = last >= 0 ? '#00d4ff' : '#ff3d5a';
+    pnlChart.update('none');
+  }
+}
+
+function updateAgents(d) {
+  const health = d.health || {};
+  const metrics = d.metrics || {};
+  const grid = document.getElementById('agentsGrid');
+
+  const agentDefs = [
+    { id:'execution_quality',   name:'Agent 1\nExecution Quality',   icon:'⚡' },
+    { id:'market_intelligence', name:'Agent 2\nMarket Intelligence', icon:'🌐' },
+    { id:'risk_management',     name:'Agent 3\nRisk Management',     icon:'🛡️' },
+    { id:'audit_backtesting',   name:'Agent 4\nAudit & Backtest',    icon:'📋' },
+    { id:'meta_supervisor',     name:'Agent 5\nMeta Supervisor',     icon:'👁️' },
+  ];
+
+  grid.innerHTML = agentDefs.map(a => {
+    const h = health[a.id] || {};
+    const m = metrics[a.id] || {};
+    const isHealthy = h.healthy;
+    const ago = h.seconds_ago;
+    const cls = isHealthy ? 'healthy' : (ago === null ? '' : 'critical');
+
+    let metric = '';
+    if (a.id === 'execution_quality') metric = `Score: ${(m.execution_score||0).toFixed(0)}`;
+    else if (a.id === 'risk_management') metric = `Risk: ${m.risk_score||0}/100`;
+    else if (a.id === 'market_intelligence') metric = `Calls: ${m.sentiment_calls||0}`;
+    else if (a.id === 'audit_backtesting') metric = `Backtests: ${m.backtests_run||0}`;
+    else if (a.id === 'meta_supervisor') metric = `Health: ${m.system_health_pct||0}%`;
+
+    return `
+      <div class="agent-card ${cls}">
+        <div class="agent-name" style="white-space:pre-line">${a.icon} ${a.name}</div>
+        <div class="agent-status">
+          <div class="status-dot ${isHealthy?'dot-green':(ago===null?'dot-yellow':'dot-red')}"></div>
+          <span style="color:${isHealthy?'var(--green)':(ago===null?'var(--muted)':'var(--red)')};font-size:10px">
+            ${isHealthy ? 'يعمل' : (ago === null ? 'لم يبدأ' : 'متوقف')}
+          </span>
+        </div>
+        <div class="agent-metric">${metric}</div>
+        ${ago !== null ? `<div class="agent-metric" style="color:var(--muted)">${ago}s ago</div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  // Meta metrics
+  const meta = metrics['meta_supervisor'] || {};
+  const audit = metrics['audit_backtesting'] || {};
+  document.getElementById('sysHealth').textContent = (meta.system_health_pct || 0).toFixed(0) + '%';
+  document.getElementById('anomalies').textContent = meta.anomalies_detected || 0;
+  document.getElementById('alertsSent').textContent = meta.alerts_sent || 0;
+  document.getElementById('lastBacktest').textContent = (audit.last_backtest_sharpe || 0).toFixed(2);
+  document.getElementById('paramUpdates').textContent = audit.param_updates_suggested || 0;
+
+  // Execution metrics
+  const exec = metrics['execution_quality'] || {};
+  document.getElementById('execScore').textContent = (exec.execution_score || 0).toFixed(0);
+  document.getElementById('avgSlippage').textContent = (exec.avg_slippage || 0).toFixed(4) + '%';
+  document.getElementById('maxSlippage').textContent = (exec.max_slippage || 0).toFixed(4) + '%';
+  document.getElementById('liqWarnings').textContent = exec.liquidity_warnings || 0;
+  document.getElementById('ordersAnalyzed').textContent = exec.orders_analyzed || 0;
+
+  // Risk score meter
+  const risk = metrics['risk_management'] || {};
+  const rs = risk.risk_score || 0;
+  document.getElementById('riskScore').textContent = rs;
+  const fill = document.getElementById('riskFill');
+  fill.style.width = rs + '%';
+  fill.style.background = rs > 70 ? 'var(--red)' : rs > 40 ? 'var(--yellow)' : 'var(--green)';
+  document.getElementById('riskScore').className = 'card-value ' + (rs > 70 ? 'negative' : rs > 40 ? 'warning' : 'positive');
+}
+
+const EVENT_TYPE_MAP = {
+  trading_halt:     { cls:'type-critical', label:'HALT' },
+  agent_down:       { cls:'type-critical', label:'DOWN' },
+  risk_breach:      { cls:'type-critical', label:'RISK' },
+  slippage_alert:   { cls:'type-warning',  label:'SLIP' },
+  drawdown_warning: { cls:'type-warning',  label:'DD' },
+  regime_change:    { cls:'type-warning',  label:'REGIME' },
+  liquidity_warning:{ cls:'type-warning',  label:'LIQ' },
+  param_suggestion: { cls:'type-info',     label:'PARAM' },
+  onchain_signal:   { cls:'type-info',     label:'CHAIN' },
+  backtest_result:  { cls:'type-success',  label:'BT' },
+  agent_health:     { cls:'type-success',  label:'HEALTH' },
+  sentiment_update: { cls:'type-info',     label:'SENT' },
+  var_update:       { cls:'type-info',     label:'VAR' },
+  order_quality:    { cls:'type-success',  label:'EXEC' },
+  performance_update:{ cls:'type-success', label:'PERF' },
+};
+
+function updateEvents(d) {
+  const feed = document.getElementById('eventsFeed');
+  const events = d.events || [];
+  if (!events.length) return;
+
+  feed.innerHTML = events.slice(0,25).map(e => {
+    const ts = new Date(e.timestamp * 1000);
+    const time = ts.toLocaleTimeString('ar-SA',{hour12:false});
+    const msg = e.payload?.message || e.type;
+    const typeInfo = EVENT_TYPE_MAP[e.type] || { cls:'type-info', label: e.type.slice(0,6).toUpperCase() };
+    return `
+      <div class="event-item">
+        <div class="event-time">${time}</div>
+        <div class="event-type ${typeInfo.cls}">${typeInfo.label}</div>
+        <div class="event-msg">${msg}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function showMockData() {
+  // Mock data when API not connected
+  document.getElementById('totalPnl').textContent = '+12.34%';
+  document.getElementById('totalPnl').className = 'card-value positive';
+  document.getElementById('dailyPnl').textContent = '+1.82%';
+  document.getElementById('dailyPnl').className = 'card-value positive';
+  document.getElementById('winRate').textContent = '62.5%';
+  document.getElementById('tradesCount').textContent = '48 صفقة';
+  document.getElementById('sharpe').textContent = '1.87';
+  document.getElementById('maxDD').textContent = '3.2%';
+  document.getElementById('var95').textContent = '0.024%';
+  document.getElementById('dailyDD').textContent = '0.8%';
+  document.getElementById('openPos').textContent = '2';
+  document.getElementById('tradingStatus').textContent = '🟢 نشط';
+  document.getElementById('tradingStatus').style.color = 'var(--green)';
+  document.getElementById('execScore').textContent = '94';
+  document.getElementById('riskScore').textContent = '22';
+  document.getElementById('riskScore').className = 'card-value positive';
+  document.getElementById('riskFill').style.width = '22%';
+  document.getElementById('riskFill').style.background = 'var(--green)';
+  document.getElementById('sysHealth').textContent = '100%';
+  document.getElementById('anomalies').textContent = '0';
+  document.getElementById('alertsSent').textContent = '3';
+  document.getElementById('lastBacktest').textContent = '1.92';
+  document.getElementById('paramUpdates').textContent = '2';
+  document.getElementById('avgSlippage').textContent = '0.0031%';
+  document.getElementById('maxSlippage').textContent = '0.0142%';
+  document.getElementById('liqWarnings').textContent = '1';
+  document.getElementById('ordersAnalyzed').textContent = '48';
+  document.getElementById('p-fast').textContent = '9';
+  document.getElementById('p-slow').textContent = '21';
+  document.getElementById('p-rsi').textContent = '14';
+  document.getElementById('p-ob').textContent = '70';
+  document.getElementById('p-os').textContent = '30';
+  document.getElementById('p-atr').textContent = '2.0';
+
+  // Mock regimes
+  document.getElementById('regimeBadges').innerHTML = `
+    <div class="regime-item"><span class="regime-symbol">BTC</span><span class="regime-badge regime-trending_up">📈 trending_up</span><span class="regime-vol">2.4%</span></div>
+    <div class="regime-item"><span class="regime-symbol">ETH</span><span class="regime-badge regime-ranging">↔️ ranging</span><span class="regime-vol">1.8%</span></div>
+    <div class="regime-item"><span class="regime-symbol">SOL</span><span class="regime-badge regime-volatile">⚡ volatile</span><span class="regime-vol">5.1%</span></div>
+  `;
+
+  // Mock agents
+  const agentDefs = [
+    { id:'execution_quality',   name:'Agent 1\nExecution Quality',   icon:'⚡', metric:'Score: 94' },
+    { id:'market_intelligence', name:'Agent 2\nMarket Intelligence', icon:'🌐', metric:'Calls: 12' },
+    { id:'risk_management',     name:'Agent 3\nRisk Management',     icon:'🛡️', metric:'Risk: 22/100' },
+    { id:'audit_backtesting',   name:'Agent 4\nAudit & Backtest',    icon:'📋', metric:'Backtests: 1' },
+    { id:'meta_supervisor',     name:'Agent 5\nMeta Supervisor',     icon:'👁️', metric:'Health: 100%' },
+  ];
+  document.getElementById('agentsGrid').innerHTML = agentDefs.map(a => `
+    <div class="agent-card healthy">
+      <div class="agent-name" style="white-space:pre-line">${a.icon} ${a.name}</div>
+      <div class="agent-status"><div class="status-dot dot-green"></div><span style="color:var(--green);font-size:10px">يعمل</span></div>
+      <div class="agent-metric">${a.metric}</div>
+    </div>
+  `).join('');
+
+  // Mock events
+  const mockEvents = [
+    { t:'type-success', l:'BT',    m:'📊 Backtest أسبوعي: Sharpe=1.92, Win Rate=63.5%' },
+    { t:'type-warning', l:'PARAM', m:'⚙️ اقتراح تحديث بارامترات: Trending Up - MAs أسرع' },
+    { t:'type-info',    l:'REGIME',m:'📈 تغيير Regime على BTCUSDT: ranging → trending_up' },
+    { t:'type-info',    l:'CHAIN', m:'🐋 حركة whale: to_exchange $2,340,000 في ETHUSDT' },
+    { t:'type-success', l:'EXEC',  m:'⚡ جودة تنفيذ ممتازة - Slippage: 0.0031%' },
+    { t:'type-info',    l:'SENT',  m:'Funding rate محايد على SOLUSDT: 0.012%' },
+    { t:'type-success', l:'HEALTH',m:'✅ تقرير صحة: 5/5 agents يعملون بكفاءة' },
+  ];
+  document.getElementById('eventsFeed').innerHTML = mockEvents.map(e => `
+    <div class="event-item">
+      <div class="event-time">${new Date().toLocaleTimeString('ar-SA',{hour12:false})}</div>
+      <div class="event-type ${e.t}">${e.l}</div>
+      <div class="event-msg">${e.m}</div>
+    </div>
+  `).join('');
+
+  // Mock PnL chart
+  const labels = Array.from({length:48},(_,i)=>i);
+  let cum = 0;
+  const vals = labels.map(()=>{
+    cum += (Math.random()-0.42)*0.5;
+    return parseFloat(cum.toFixed(3));
+  });
+  pnlChart.data.labels = labels;
+  pnlChart.data.datasets[0].data = vals;
+  pnlChart.update('none');
+}
+
+// ─── Init ─────────────────────────────────────────────
+initCharts();
+fetchAndUpdate();
+setInterval(fetchAndUpdate, 10000);
+</script>
+</body>
+</html>
