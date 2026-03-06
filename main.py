@@ -1,6 +1,5 @@
 """
 Main — نقطة الإطلاق الرئيسية
-يشغل كل الـ agents بالتوازي
 """
 
 import asyncio
@@ -15,9 +14,10 @@ from agents.agent3_risk import RiskManagementAgent
 from agents.agent4_audit import AuditBacktestAgent
 from agents.agent5_meta import MetaSupervisorAgent
 from agents.orchestrator import Orchestrator
+from core.daily_report import DailyReportEngine
+from core.auto_optimizer import AutoOptimizer
 from api_server import app
 
-# Logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
@@ -27,7 +27,6 @@ logger = logging.getLogger("Main")
 
 
 async def run_all_agents():
-    """تشغيل كل الـ agents بالتوازي"""
     agents = [
         ExecutionQualityAgent(),
         MarketIntelligenceAgent(),
@@ -37,16 +36,21 @@ async def run_all_agents():
         Orchestrator(),
     ]
 
+    daily_report  = DailyReportEngine()
+    auto_optimizer = AutoOptimizer()
+
     logger.info("🚀 Sovereign Trading System — LAUNCHING")
     logger.info("=" * 50)
     for a in agents:
         logger.info(f"   ► {a.name}")
+    logger.info("   ► Daily Report Engine")
+    logger.info("   ► Auto-Optimizer")
     logger.info("=" * 50)
 
-    # تشغيل كل agent في task منفصل
     tasks = [asyncio.create_task(agent.start()) for agent in agents]
+    tasks.append(asyncio.create_task(daily_report.start()))
+    tasks.append(asyncio.create_task(auto_optimizer.start()))
 
-    # Graceful shutdown
     loop = asyncio.get_event_loop()
     stop_event = asyncio.Event()
 
@@ -55,13 +59,17 @@ async def run_all_agents():
         stop_event.set()
 
     for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, _shutdown)
+        try:
+            loop.add_signal_handler(sig, _shutdown)
+        except NotImplementedError:
+            pass  # Windows
 
     await stop_event.wait()
 
-    # إيقاف
     for agent in agents:
         await agent.stop()
+    await daily_report.stop()
+    await auto_optimizer.stop()
     for task in tasks:
         task.cancel()
 
@@ -70,14 +78,11 @@ async def run_all_agents():
 
 @asynccontextmanager
 async def lifespan(app):
-    # Start agents in background when FastAPI starts
     task = asyncio.create_task(run_all_agents())
     yield
     task.cancel()
 
-# Attach lifespan to FastAPI
 app.router.lifespan_context = lifespan
-
 
 if __name__ == "__main__":
     uvicorn.run(

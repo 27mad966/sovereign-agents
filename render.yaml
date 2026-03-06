@@ -1,8 +1,7 @@
-# Render Deployment
 services:
   - type: web
-    name: sovereign-trading-system
-    runtime: python
+    name: sovereign-agents
+    env: python
     buildCommand: pip install -r requirements.txt
     startCommand: python main.py
     envVars:
@@ -14,4 +13,9 @@ services:
         sync: false
       - key: TELEGRAM_CHAT_ID
         sync: false
-    healthCheckPath: /health
+      - key: ANALYSIS_TIMEFRAME
+        value: 15m
+      - key: HTF_TIMEFRAME
+        value: 1h
+      - key: SYMBOLS
+        value: BTCUSDT,ETHUSDT,SOLUSDT

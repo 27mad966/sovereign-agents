@@ -140,10 +140,14 @@ class Orchestrator:
             "parse_mode": "Markdown",
         }
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=payload, timeout=10) as resp:
-                    if resp.status != 200:
-                        logger.error(f"Telegram error: {resp.status}")
+            import requests
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.post(url, json=payload, timeout=10)
+            )
+            if response.status_code != 200:
+                logger.error(f"Telegram error: {response.status_code}")
         except Exception as e:
             logger.error(f"Telegram send failed: {e}")
 
