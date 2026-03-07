@@ -88,6 +88,23 @@ async def get_agents():
         "metrics": state.agent_metrics,
     }
 
+
+@app.get("/api/optimizer")
+async def get_optimizer():
+    """نتائج Auto-Optimizer للـ Dashboard"""
+    from core.auto_optimizer import OPTIMIZER_RESULTS, OPTIMIZER_STATUS, CURRENT_PARAMS
+    return {
+        "status":   OPTIMIZER_STATUS,
+        "results":  OPTIMIZER_RESULTS,
+        "current_params": CURRENT_PARAMS,
+        "timestamp": time.time(),
+    }
+
+@app.get("/api/optimizer/history")
+async def get_optimizer_history():
+    from core.auto_optimizer import OPTIMIZER_HISTORY
+    return {"history": OPTIMIZER_HISTORY[-50:]}
+
 @app.get("/api/events")
 async def get_events(n: int = 50):
     return {"events": bus.get_recent_events(n)}
