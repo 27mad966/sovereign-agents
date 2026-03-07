@@ -146,6 +146,10 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         ws_clients.remove(websocket)
 
+@app.get("/")
+async def root():
+    return {"name": "Sovereign Agents", "status": "ok", "version": "2.0"}
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "timestamp": time.time()}
